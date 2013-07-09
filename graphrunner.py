@@ -256,6 +256,19 @@ class GraphRunnerTestCase(unittest.TestCase):
 		with self.assertRaises(KeyError):
 			self.harness.execute('target')
 
+	def test_execute_once(self):
+		anonymous = lambda : self.target()
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target)
+		self.harness.target('target3', self.target)
+		self.harness.depends('target', 'target2 target3')
+		self.harness.depends('target2', 'target3')
+		self.harness.depends('target', anonymous)
+		self.harness.depends('target2', anonymous)
+		self.harness.depends('target3', anonymous)
+		self.harness.execute('target')
+		self.assertEquals(self.targetCalled, 4) # 3 unique named targets and 1 unique anonymous dependency
+
 
 if __name__ == '__main__':
     unittest.main()
