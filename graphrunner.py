@@ -22,26 +22,27 @@
 
 import unittest, subprocess
 
-class Builder:
-	"""A very simple build script tool
+class GraphRunner:
+	"""A tool to execute functions based on a simple dependency graph
 
-	The Builder class enables the creation of very simple build scripts by encapsulating targets and dependencies.
-	Targets define what it is your build script needs to do and dependencies relate different targets together.
+	The GraphRunner class enables the creation of scripts by encapsulating targets and dependencies.
+	Targets define what it is your script needs to do and dependencies relate different targets together.
 
-	A single target can be one of 3 types:
+	A single target can be one of:
 	* A callable that requires 0 arguments
-	* A string that defines a command line to be executed
 	* None, which does nothing (useful for grouping dependencies without requiring a final action)
 
 	Dependencies are defined in one of three ways:
 	* a space-delimited string of targets
 	* A callable that requires 0 arguments (An "anonymous dependency")
-	* a list of valid dependencies
+	* a list of dependencies
 
 	Multiple dependencies can be defined for a single target and they will be appended.
 
-	When you execute a target, the builder will first recursively execute the target's dependencies, then execute the target's action.
+	When you execute a target it's dependencies will be recursively executed before the target's action is performed.
 	Each of the dependencies will only be executed once, and the order is not guaranteed other than what is defined by the dependencies.
+	Cycles in the graph are possible, and are handled at run time (dependecies of a target are always executed before the target)
+	Missing dependencies are reported at run time (as KeyError exceptions).
 
 	"""
 
@@ -50,7 +51,7 @@ class Builder:
 		self._deps = {}
 
 	def target(self, name, action, deps = []):
-		"""Adds a target to the builder"""
+		"""Adds a target to the graph"""
 		if ' ' in name:
 			raise ValueError('name may not contain spaces')
 
@@ -58,7 +59,7 @@ class Builder:
 		self.depends(name, deps)
 
 	def depends(self, name, deps):
-		"""Adds a dependency to the builder"""
+		"""Adds a dependency to the graph"""
 		if not isinstance(name, str):
 			raise TypeError('name must be a string')
 
@@ -74,7 +75,7 @@ class Builder:
 			raise TypeError(str(type(deps)) + ' is not a valid dependancy type')
 
 	def execute(self, name):
-		"""Executes a target on the builder"""
+		"""Executes a target on the graph"""
 		if not isinstance(name, str):
 			raise TypeError('name must be a string')
 
@@ -84,7 +85,7 @@ class Builder:
 		self._execute(name, [])
 
 	def get_targets(self):
-		"""Retrieves a sorted list of all targets available on this builder"""
+		"""Retrieves an alpha sorted list of all targets available on this graph"""
 		targets = self._targets.keys()
 		targets.sort()
 		return targets
@@ -99,121 +100,118 @@ class Builder:
 			self._deps[name] = [dep]
 
 	def _execute(self, name, done):
+		if not isinstance(name, str):
+			raise TypeError('name must be a string')
+
+		if name in done:
+			return
+
+		done.append(name)
+
 		if name in self._deps:
 			deps = self._deps[name]
 			for dep in deps:
-				if callable(dep) and dep not in done:
-					done.append(dep)
-					dep()
+				if callable(dep):
+					if dep not in done:
+						done.append(dep)
+						dep()
 				else:
 					self._execute(dep, done)
 
 		action = self._targets[name]
 
-		if name not in done:
-			done.append(name)
-			if isinstance(action, str):
-				subprocess.check_call(action, shell=True)
-			elif callable(action):
-				action()
-			elif action is None:
-				pass
-			else:
-				raise TypeError(name + ' is not a valid target type')
+		if isinstance(action, str):
+			subprocess.check_call(action, shell=True)
+		elif callable(action):
+			action()
+		elif action is None:
+			pass
+		else:
+			raise TypeError(name + ' is not a valid target type')
 
 
-class BuilderTestCase(unittest.TestCase):
-	"""Unit tests for the Builder class"""
+class GraphRunnerTestCase(unittest.TestCase):
+	"""Unit tests for the GraphRunner class"""
+
 	def setUp(self):
 		self.targetCalled = 0
+		self.harness = GraphRunner()
 
 	def target(self):
 		self.targetCalled += 1
 
 	def test_add_target(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		self.assertIn('target', builder._targets)
+		self.harness.target('target', self.target)
+		self.assertIn('target', self.harness._targets)
 
 	def test_add_target_with_space(self):
-		builder = Builder()
 		with self.assertRaises(ValueError):
-			builder.target('target with space', self.target)
+			self.harness.target('target with space', self.target)
 
 	def test_execute(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.execute('target')
+		self.harness.target('target', self.target)
+		self.harness.execute('target')
 		self.assertEquals(self.targetCalled, 1)
 
 	def test_add_dep(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.target('target2', self.target)
-		builder.depends('target', 'target2')
-		self.assertIn('target', builder._deps)
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target)
+		self.harness.depends('target', 'target2')
+		self.assertIn('target', self.harness._deps)
 
 	def test_execute_string_dep(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.target('target2', self.target)
-		builder.depends('target', 'target2')
-		builder.execute('target')
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target)
+		self.harness.depends('target', 'target2')
+		self.harness.execute('target')
 		self.assertEquals(self.targetCalled, 2)
 
 	def test_execute_function_dep(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.depends('target', self.target)
-		builder.execute('target')
+		self.harness.target('target', self.target)
+		self.harness.depends('target', self.target)
+		self.harness.execute('target')
 		self.assertEquals(self.targetCalled, 2)
 
 	def test_execute_list_dep(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.target('target2', self.target)
-		builder.depends('target', ['target2', self.target])
-		builder.execute('target')
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target)
+		self.harness.depends('target', ['target2', self.target])
+		self.harness.execute('target')
 		self.assertEquals(self.targetCalled, 3)
 
 	def test_execute_multi_string_dep(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.target('target2', self.target)
-		builder.target('target3', self.target)
-		builder.depends('target', 'target2 target3')
-		builder.execute('target')
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target)
+		self.harness.target('target3', self.target)
+		self.harness.depends('target', 'target2 target3')
+		self.harness.execute('target')
 		self.assertEquals(self.targetCalled, 3)
 
 	def test_execute_dup_dep(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.target('target2', self.target)
-		builder.target('target3', self.target)
-		builder.depends('target', 'target2')
-		builder.depends('target', 'target3')
-		builder.depends('target2', 'target3')
-		builder.execute('target')
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target)
+		self.harness.target('target3', self.target)
+		self.harness.depends('target', 'target2')
+		self.harness.depends('target', 'target3')
+		self.harness.depends('target2', 'target3')
+		self.harness.execute('target')
 		self.assertEquals(self.targetCalled, 3)
 
 	def test_execute_command(self):
-		builder = Builder()
-		builder.target('target', 'echo test')
-		builder.execute('target')
+		self.harness.target('target', 'echo test')
+		self.harness.execute('target')
 
 	def test_execute_string_dep_in_target(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.target('target2', self.target, 'target')
-		builder.execute('target2')
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target, 'target')
+		self.harness.execute('target2')
 		self.assertEquals(self.targetCalled, 2)
 
 	def test_execute_none_target(self):
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.target('noneTarget', None)
-		builder.depends('noneTarget', 'target')
-		builder.execute('noneTarget')
+		self.harness.target('target', self.target)
+		self.harness.target('noneTarget', None)
+		self.harness.depends('noneTarget', 'target')
+		self.harness.execute('noneTarget')
 		self.assertEquals(self.targetCalled, 1)
 
 	def test_dep_order(self):
@@ -226,25 +224,38 @@ class BuilderTestCase(unittest.TestCase):
 		def target2_dep():
 			self.assertEquals(target1_complete['value'], True)
 
-		builder = Builder()
-		builder.target('target', self.target)
-		builder.target('target2', target1_dep)
-		builder.target('target3', target2_dep, 'target2')
-		builder.depends('target2', 'target')
-		builder.execute('target3')
+		self.harness.target('target', self.target)
+		self.harness.target('target2', target1_dep)
+		self.harness.target('target3', target2_dep, 'target2')
+		self.harness.depends('target2', 'target')
+		self.harness.execute('target3')
 		self.assertEquals(self.targetCalled, 1)
 		self.assertEquals(target1_complete['value'], True)
 
 	def test_get_targets(self):
-		builder = Builder()
-		builder.target('target1', None)
-		builder.target('target2', self.target)
-		builder.target('target3', 'echo target3')
-		targets = builder.targets
+		self.harness.target('target1', None)
+		self.harness.target('target2', self.target)
+		self.harness.target('target3', 'echo target3')
+		targets = self.harness.targets
 		self.assertEquals(len(targets), 3)
 		self.assertIn('target1', targets)
 		self.assertIn('target2', targets)
 		self.assertIn('target3', targets)
+
+	def test_circular_dep(self):
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target)
+		self.harness.depends('target', 'target2')
+		self.harness.depends('target2', 'target')
+		self.harness.execute('target')
+		self.assertEquals(self.targetCalled, 2)
+
+	def test_missing_dep(self):
+		self.harness.target('target', self.target)
+		self.harness.depends('target', 'target2')
+		with self.assertRaises(KeyError):
+			self.harness.execute('target')
+
 
 if __name__ == '__main__':
     unittest.main()
