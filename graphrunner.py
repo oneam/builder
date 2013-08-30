@@ -31,6 +31,7 @@ class GraphRunner:
 	A single target can be one of:
 	* A callable that requires 0 arguments
 	* None, which does nothing (useful for grouping dependencies without requiring a final action)
+	* A string, which is called using subprocess.check_call(cmd, shell=True)
 
 	Dependencies are defined in one of three ways:
 	* a space-delimited string of targets
@@ -74,15 +75,18 @@ class GraphRunner:
 		else:
 			raise TypeError(str(type(deps)) + ' is not a valid dependancy type')
 
-	def execute(self, name):
-		"""Executes a target on the graph"""
-		if not isinstance(name, str):
-			raise TypeError('name must be a string')
+	def execute(self, names):
+		"""Executes a space delimited string or list of target names on the graph"""
 
-		if name not in self._targets:
-			raise LookupError(name + ' is not a valid target')
+		if isinstance(names, str):
+			names = names.strip().split()
 
-		self._execute(name, [])
+		if not isinstance(names, list):
+			raise TypeError('names must be a string or a list')
+
+		done = []
+		for name in names:
+			self._execute(name, done)
 
 	def get_deps(self, name):
 		"""Retrieves a list of the dependencies for a given target"""
@@ -116,6 +120,9 @@ class GraphRunner:
 	def _execute(self, name, done):
 		if not isinstance(name, str):
 			raise TypeError('name must be a string')
+
+		if name not in self._targets:
+			raise LookupError(name + ' is not a valid target')
 
 		if name in done:
 			return
@@ -284,7 +291,7 @@ class GraphRunnerTestCase(unittest.TestCase):
 	def test_missing_dep(self):
 		self.harness.target('target', self.target)
 		self.harness.depends('target', 'target2')
-		with self.assertRaises(KeyError):
+		with self.assertRaises(LookupError):
 			self.harness.execute('target')
 
 	def test_execute_once(self):
@@ -299,6 +306,13 @@ class GraphRunnerTestCase(unittest.TestCase):
 		self.harness.depends('target3', anonymous)
 		self.harness.execute('target')
 		self.assertEquals(self.targetCalled, 4) # 3 unique named targets and 1 unique anonymous dependency
+
+	def test_execute_multiple(self):
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target)
+		self.harness.target('target3', self.target)
+		self.harness.execute(['target', 'target2', 'target3'])
+		self.assertEquals(self.targetCalled, 3)
 
 
 if __name__ == '__main__':
