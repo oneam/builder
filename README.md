@@ -9,7 +9,7 @@ Targets define what it is your script needs to do and dependencies relate differ
 A single target can be one of:
 * A callable that requires 0 arguments
 * None, which does nothing (useful for grouping dependencies without requiring a final action)
-* A string, which is called using subprocess.check_call(cmd, shell=True)
+* A string, which is executed in a shell using subprocess.check_call(cmd, shell=True)
 
 Dependencies are defined in one of three ways:
 * a space-delimited string of targets
