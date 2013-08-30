@@ -175,9 +175,17 @@ class GraphRunnerTestCase(unittest.TestCase):
 	def test_execute_list_dep(self):
 		self.harness.target('target', self.target)
 		self.harness.target('target2', self.target)
-		self.harness.depends('target', ['target2', self.target])
+		self.harness.target('target3', self.target)
+		self.harness.depends('target', ['target2', 'target3', self.target])
 		self.harness.execute('target')
-		self.assertEquals(self.targetCalled, 3)
+		self.assertEquals(self.targetCalled, 4)
+
+	def test_execute_list_dep_simple_syntax(self):
+		self.harness.target('target2', self.target)
+		self.harness.target('target3', self.target)
+		self.harness.target('target', self.target, ['target2', 'target3', self.target])
+		self.harness.execute('target')
+		self.assertEquals(self.targetCalled, 4)
 
 	def test_execute_multi_string_dep(self):
 		self.harness.target('target', self.target)
@@ -196,6 +204,14 @@ class GraphRunnerTestCase(unittest.TestCase):
 		self.harness.depends('target2', 'target3')
 		self.harness.execute('target')
 		self.assertEquals(self.targetCalled, 3)
+
+	def test_execute_dup_dep_simple_syntax(self):
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target, 'target')
+		self.harness.target('target3', self.target, ['target', 'target2'])
+		self.harness.target('target4', self.target, 'target target2 target3')
+		self.harness.execute('target4')
+		self.assertEquals(self.targetCalled, 4)
 
 	def test_execute_command(self):
 		self.harness.target('target', 'echo test')
