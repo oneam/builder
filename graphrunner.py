@@ -84,6 +84,19 @@ class GraphRunner:
 
 		self._execute(name, [])
 
+	def get_deps(self, name):
+		"""Retrieves a list of the dependencies for a given target"""
+		if not isinstance(name, str):
+			raise TypeError('name must be a string')
+
+		if name not in self._targets:
+			raise LookupError(name + ' is not a valid target')
+
+		if name not in self._deps:
+			return []
+
+		return self._deps[name]
+
 	def get_targets(self):
 		"""Retrieves an alpha sorted list of all targets available on this graph"""
 		targets = self._targets.keys()
@@ -94,7 +107,7 @@ class GraphRunner:
 
 	def _add_dep(self, name, dep):
 		if name in self._deps:
-			if dep not in self._deps:
+			if dep not in self._deps[name]:
 				self._deps[name].append(dep)
 		else:
 			self._deps[name] = [dep]
@@ -287,4 +300,4 @@ class GraphRunnerTestCase(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+	unittest.main()

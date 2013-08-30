@@ -1,7 +1,7 @@
 GraphRunner
 =======
 
-"""A tool to execute functions based on a simple dependency graph
+A tool to execute functions based on a simple dependency graph
 
 The GraphRunner class enables the creation of scripts by encapsulating targets and dependencies.
 Targets define what it is your script needs to do and dependencies relate different targets together.
@@ -9,6 +9,7 @@ Targets define what it is your script needs to do and dependencies relate differ
 A single target can be one of:
 * A callable that requires 0 arguments
 * None, which does nothing (useful for grouping dependencies without requiring a final action)
+* A string, which is called using subprocess.check_call(cmd, shell=True)
 
 Dependencies are defined in one of three ways:
 * a space-delimited string of targets
