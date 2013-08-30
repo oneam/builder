@@ -94,7 +94,7 @@ class GraphRunner:
 			raise TypeError('name must be a string')
 
 		if name not in self._targets:
-			raise LookupError(name + ' is not a valid target')
+			raise KeyError(name + ' is not a valid target')
 
 		if name not in self._deps:
 			return []
@@ -122,7 +122,7 @@ class GraphRunner:
 			raise TypeError('name must be a string')
 
 		if name not in self._targets:
-			raise LookupError(name + ' is not a valid target')
+			raise KeyError(name + ' is not a valid target')
 
 		if name in done:
 			return
@@ -291,7 +291,7 @@ class GraphRunnerTestCase(unittest.TestCase):
 	def test_missing_dep(self):
 		self.harness.target('target', self.target)
 		self.harness.depends('target', 'target2')
-		with self.assertRaises(LookupError):
+		with self.assertRaises(KeyError):
 			self.harness.execute('target')
 
 	def test_execute_once(self):
