@@ -215,9 +215,17 @@ class GraphRunnerTestCase(unittest.TestCase):
 		self.harness.target('target3', self.target)
 		self.harness.target('target4', self.target)
 		self.harness.depends('target3', 'target4')
-		self.harness.depends('target2', ['target3', 'target4'])
-		self.harness.depends('target', 'target2 target3 target4')
+		self.harness.depends('target2', 'target3 target4')
+		self.harness.depends('target', ['target2', 'target3', 'target4'])
 		self.harness.execute('target')
+		self.assertEquals(self.targetCalled, 4)
+
+	def test_execute_dup_dep_simple_syntax(self):
+		self.harness.target('target', self.target)
+		self.harness.target('target2', self.target, 'target')
+		self.harness.target('target3', self.target, ['target', 'target2'])
+		self.harness.target('target4', self.target, 'target target2 target3')
+		self.harness.execute('target4')
 		self.assertEquals(self.targetCalled, 4)
 
 	def test_execute_command(self):
