@@ -20,7 +20,7 @@
 #  IN THE SOFTWARE.
 #
 
-import unittest, subprocess
+import unittest, subprocess, sys, argparse
 
 class GraphRunner:
 	"""A tool to execute functions based on a simple dependency graph
@@ -150,6 +150,10 @@ class GraphRunner:
 		else:
 			raise TypeError(name + ' is not a valid target type')
 
+	def execute_as_commandline(self, args = sys.argv, parser = argparse.ArgumentParser()):
+		parser.add_argument('targets', nargs='*', help='Targets to execute')
+		args = parser.parse_args()
+		self.execute(args.targets)
 
 class GraphRunnerTestCase(unittest.TestCase):
 	"""Unit tests for the GraphRunner class"""
@@ -313,6 +317,14 @@ class GraphRunnerTestCase(unittest.TestCase):
 		self.harness.target('target3', self.target)
 		self.harness.execute(['target', 'target2', 'target3'])
 		self.assertEquals(self.targetCalled, 3)
+
+	def test_execute_as_commandline(self):
+		self.harness.target('target1', self.target)
+		self.harness.target('target2', self.target)
+		sys.argv.append('target1')
+		sys.argv.append('target2')
+		self.harness.execute_as_commandline()
+		self.assertEquals(self.targetCalled, 2)
 
 
 if __name__ == '__main__':
